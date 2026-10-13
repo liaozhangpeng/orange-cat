@@ -311,6 +311,170 @@ final class Ball {
     var visible: Bool { state != .none }
 }
 
+/// One dish per weekday. Lunch and dinner never share a dish.
+enum MealKind {
+    case xiaolongbao, sandwich, ramen, burger, sushi, pizza, dumpling
+    case soup, fish, hotpot, steak, curry, friedNoodles, skewer
+
+    static func todays(lunch: Bool, on date: Date = Date()) -> (MealKind, String) {
+        let index = Calendar.current.component(.weekday, from: date) - 1
+        let lunchMenu: [(MealKind, String)] = [
+            (.xiaolongbao, "小笼包"), (.sandwich, "三明治"), (.ramen, "拉面"),
+            (.burger, "汉堡"), (.sushi, "寿司"), (.pizza, "披萨"), (.dumpling, "饺子"),
+        ]
+        let dinnerMenu: [(MealKind, String)] = [
+            (.soup, "汤面"), (.fish, "烤鱼"), (.hotpot, "火锅"),
+            (.steak, "牛排"), (.curry, "咖喱饭"), (.friedNoodles, "炒面"), (.skewer, "烧烤"),
+        ]
+        return (lunch ? lunchMenu : dinnerMenu)[index]
+    }
+
+    func draw(in r: CGRect) {
+        func X(_ u: CGFloat) -> CGFloat { r.minX + r.width * u }
+        func Y(_ v: CGFloat) -> CGFloat { r.minY + r.height * v }
+        func R(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGRect {
+            CGRect(x: X(x), y: Y(y), width: r.width * w, height: r.height * h)
+        }
+        func paint(_ path: NSBezierPath, _ fill: NSColor, width: CGFloat = 2.2) {
+            fill.setFill(); path.fill()
+            Palette.outline.setStroke(); path.lineWidth = width; path.lineJoinStyle = .round; path.stroke()
+        }
+        func oval(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ fill: NSColor) {
+            paint(NSBezierPath(ovalIn: R(x, y, w, h)), fill)
+        }
+        switch self {
+        case .xiaolongbao:
+            let bun = NSBezierPath()
+            bun.move(to: P(X(0.5), Y(0.86)))
+            bun.curve(to: P(X(0.12), Y(0.28)), controlPoint1: P(X(0.18), Y(0.82)), controlPoint2: P(X(0.08), Y(0.5)))
+            bun.curve(to: P(X(0.88), Y(0.28)), controlPoint1: P(X(0.2), Y(0.08)), controlPoint2: P(X(0.8), Y(0.08)))
+            bun.curve(to: P(X(0.5), Y(0.86)), controlPoint1: P(X(0.92), Y(0.5)), controlPoint2: P(X(0.82), Y(0.82)))
+            paint(bun, NSColor(hex: 0xF4D2A2))
+            Palette.outline.setStroke()
+            for side: CGFloat in [-1, 1] {
+                for t: CGFloat in [0.35, 0.5] {
+                    let pleat = NSBezierPath()
+                    pleat.move(to: P(X(0.5), Y(0.78)))
+                    pleat.line(to: P(X(0.5 + side * t * 0.55), Y(0.32)))
+                    pleat.lineWidth = 1.4; pleat.stroke()
+                }
+            }
+        case .sandwich:
+            let bread = NSBezierPath()
+            bread.move(to: P(X(0.08), Y(0.16))); bread.line(to: P(X(0.92), Y(0.16))); bread.line(to: P(X(0.5), Y(0.88))); bread.close()
+            paint(bread, NSColor(hex: 0xF6D7A4))
+            Palette.mouth.setStroke()
+            let ham = NSBezierPath(); ham.move(to: P(X(0.22), Y(0.28))); ham.line(to: P(X(0.78), Y(0.28))); ham.line(to: P(X(0.5), Y(0.62))); ham.close()
+            ham.lineWidth = 4; ham.stroke()
+            NSColor(hex: 0x7CBF6A).setStroke()
+            let leaf = NSBezierPath(); leaf.move(to: P(X(0.28), Y(0.36))); leaf.line(to: P(X(0.72), Y(0.36))); leaf.line(to: P(X(0.5), Y(0.52))); leaf.close()
+            leaf.lineWidth = 3; leaf.stroke()
+        case .ramen, .soup:
+            oval(0.08, 0.08, 0.84, 0.42, NSColor(hex: 0xF7E2C4))
+            oval(0.16, 0.2, 0.68, 0.28, self == .ramen ? NSColor(hex: 0xE7A15A) : NSColor(hex: 0xF0C48A))
+            Palette.outline.setStroke()
+            for i in 0..<3 {
+                let n = NSBezierPath()
+                let y = Y(0.28 + CGFloat(i) * 0.06)
+                n.move(to: P(X(0.26), y))
+                n.curve(to: P(X(0.74), y), controlPoint1: P(X(0.4), y + r.height * 0.05), controlPoint2: P(X(0.6), y - r.height * 0.05))
+                n.lineWidth = 1.8; n.stroke()
+            }
+            if self == .soup { oval(0.4, 0.24, 0.18, 0.14, NSColor(hex: 0xFFF4D8)) }
+        case .burger:
+            oval(0.12, 0.58, 0.76, 0.28, NSColor(hex: 0xE7B56A))
+            let patty = NSBezierPath(roundedRect: R(0.14, 0.4, 0.72, 0.16), xRadius: 4, yRadius: 4)
+            paint(patty, NSColor(hex: 0xC45A3A), width: 2)
+            let cheese = NSBezierPath(rect: R(0.16, 0.32, 0.68, 0.1))
+            paint(cheese, NSColor(hex: 0xFFD15C), width: 1.6)
+            oval(0.1, 0.12, 0.8, 0.24, NSColor(hex: 0xF6D7A4))
+        case .sushi:
+            let rice = NSBezierPath(roundedRect: R(0.12, 0.22, 0.76, 0.36), xRadius: 8, yRadius: 8)
+            paint(rice, NSColor(hex: 0xFFF6EA))
+            oval(0.16, 0.48, 0.68, 0.28, NSColor(hex: 0xFF8A7A))
+            NSColor(hex: 0x3E6B4F).setFill()
+            NSBezierPath(rect: R(0.46, 0.22, 0.08, 0.36)).fill()
+        case .pizza:
+            let slice = NSBezierPath()
+            slice.move(to: P(X(0.5), Y(0.12)))
+            slice.line(to: P(X(0.1), Y(0.78)))
+            slice.curve(to: P(X(0.9), Y(0.78)), controlPoint1: P(X(0.22), Y(0.98)), controlPoint2: P(X(0.78), Y(0.98)))
+            slice.close()
+            paint(slice, NSColor(hex: 0xF2C14E))
+            NSColor(hex: 0xE7B56A).setFill()
+            NSBezierPath(ovalIn: R(0.18, 0.62, 0.64, 0.16)).fill()
+            NSColor(hex: 0xC45A3A).setFill()
+            for (x, y) in [(0.32, 0.48), (0.5, 0.62), (0.64, 0.46)] {
+                NSBezierPath(ovalIn: R(x, y, 0.12, 0.1)).fill()
+            }
+        case .dumpling:
+            let wrap = NSBezierPath()
+            wrap.move(to: P(X(0.08), Y(0.42)))
+            wrap.curve(to: P(X(0.92), Y(0.42)), controlPoint1: P(X(0.2), Y(0.08)), controlPoint2: P(X(0.8), Y(0.08)))
+            wrap.curve(to: P(X(0.08), Y(0.42)), controlPoint1: P(X(0.78), Y(0.86)), controlPoint2: P(X(0.22), Y(0.86)))
+            paint(wrap, NSColor(hex: 0xF7E7C8))
+            Palette.outline.setStroke()
+            for t: CGFloat in [0.3, 0.42, 0.54, 0.66] {
+                let pleat = NSBezierPath()
+                pleat.move(to: P(X(t), Y(0.46))); pleat.line(to: P(X(t + 0.06), Y(0.62)))
+                pleat.lineWidth = 1.3; pleat.stroke()
+            }
+        case .fish:
+            let body = NSBezierPath(ovalIn: R(0.16, 0.28, 0.62, 0.36))
+            paint(body, NSColor(hex: 0xF2A36B))
+            let tail = NSBezierPath()
+            tail.move(to: P(X(0.72), Y(0.46))); tail.line(to: P(X(0.96), Y(0.7))); tail.line(to: P(X(0.96), Y(0.24))); tail.close()
+            paint(tail, NSColor(hex: 0xE08A52))
+            oval(0.28, 0.4, 0.1, 0.1, Palette.eye)
+            Palette.outline.setStroke()
+            let gill = NSBezierPath(); gill.move(to: P(X(0.36), Y(0.34))); gill.curve(to: P(X(0.36), Y(0.56)), controlPoint1: P(X(0.44), Y(0.4)), controlPoint2: P(X(0.44), Y(0.5)))
+            gill.lineWidth = 1.4; gill.stroke()
+        case .hotpot:
+            let pot = NSBezierPath(roundedRect: R(0.12, 0.16, 0.76, 0.42), xRadius: 10, yRadius: 10)
+            paint(pot, NSColor(hex: 0xD4544A))
+            oval(0.2, 0.28, 0.6, 0.22, NSColor(hex: 0xF2C14E))
+            Palette.outline.withAlphaComponent(0.45).setStroke()
+            for x: CGFloat in [0.3, 0.48, 0.66] {
+                let steam = NSBezierPath()
+                steam.move(to: P(X(x), Y(0.58)))
+                steam.curve(to: P(X(x + 0.04), Y(0.86)), controlPoint1: P(X(x + 0.08), Y(0.68)), controlPoint2: P(X(x - 0.06), Y(0.76)))
+                steam.lineWidth = 1.6; steam.stroke()
+            }
+        case .steak:
+            let meat = NSBezierPath(roundedRect: R(0.1, 0.28, 0.8, 0.42), xRadius: 12, yRadius: 12)
+            paint(meat, NSColor(hex: 0xC45A3A))
+            NSColor(hex: 0xF2C14E).setStroke()
+            for y: CGFloat in [0.4, 0.52] {
+                let mark = NSBezierPath(); mark.move(to: P(X(0.22), Y(y))); mark.line(to: P(X(0.78), Y(y)))
+                mark.lineWidth = 2; mark.stroke()
+            }
+        case .curry:
+            oval(0.1, 0.12, 0.8, 0.34, NSColor(hex: 0xFFF6EA))
+            oval(0.2, 0.28, 0.6, 0.36, NSColor(hex: 0xE39A2B))
+            oval(0.4, 0.4, 0.16, 0.12, NSColor(hex: 0xC45A3A))
+        case .friedNoodles:
+            oval(0.06, 0.1, 0.88, 0.28, NSColor(hex: 0xF7E2C4))
+            Palette.outline.setStroke()
+            for i in 0..<4 {
+                let n = NSBezierPath()
+                let y = Y(0.28 + CGFloat(i) * 0.08)
+                n.move(to: P(X(0.18), y))
+                n.curve(to: P(X(0.82), y + 2), controlPoint1: P(X(0.4), y + 8), controlPoint2: P(X(0.62), y - 6))
+                n.lineWidth = 2; n.stroke()
+            }
+            oval(0.62, 0.42, 0.14, 0.12, NSColor(hex: 0x7CBF6A))
+        case .skewer:
+            Palette.outline.setStroke()
+            let stick = NSBezierPath()
+            stick.move(to: P(X(0.08), Y(0.2))); stick.line(to: P(X(0.92), Y(0.78)))
+            stick.lineWidth = 2.4; stick.lineCapStyle = .round; stick.stroke()
+            oval(0.18, 0.22, 0.22, 0.22, NSColor(hex: 0xC45A3A))
+            oval(0.4, 0.4, 0.22, 0.22, NSColor(hex: 0xF2C14E))
+            oval(0.6, 0.56, 0.22, 0.22, NSColor(hex: 0x7CBF6A))
+        }
+    }
+}
+
 struct Particle {
     var pos: CGPoint
     var vel: CGVector
@@ -373,6 +537,19 @@ final class GameView: NSView {
     let restFirstUse: Double = 60 * 60
     let restRepeatUse: Double = 30 * 60
 
+    // Noon and 6pm meal reminders. One dish per weekday, lunch and dinner differ.
+    var mealReminderOn = UserDefaults.standard.object(forKey: "mealReminderEnabled") as? Bool ?? true
+    var mealLunchDay = UserDefaults.standard.string(forKey: "mealLunchDay") ?? ""
+    var mealDinnerDay = UserDefaults.standard.string(forKey: "mealDinnerDay") ?? ""
+    var mealKind: MealKind?
+    var mealStart = 0.0
+    var mealUntil = 0.0
+    var mealBorderUntil = 0.0
+    var nextCrumb = 0.0
+    var foodImageKey = ""
+    let mealBorder = CAGradientLayer()
+    let foodLayer = CALayer()
+
     // Input
     var pressed: Target = .nothing
     var mouseDownPoint = CGPoint.zero
@@ -416,6 +593,7 @@ final class GameView: NSView {
             ball.state = .flying
         }
         rebuildStaticImages()
+        updateMealBorderFrame()
         render()
     }
 
@@ -442,7 +620,7 @@ final class GameView: NSView {
     /// sleeping are those drifting z's — hearts/stars/notes all come from
     /// play events that wake the cat via wake(), so no need to check for them.)
     var isFullyIdle: Bool {
-        !restBubble && sleeping && !dragging && !catAirborne
+        !restBubble && now >= mealUntil && now >= mealBorderUntil && sleeping && !dragging && !catAirborne
             && ball.state == .none
             && jumpStart == nil && landStart == nil && throwStart == nil
             && now >= bubbleUntil
@@ -454,6 +632,7 @@ final class GameView: NSView {
     var needsFullRate: Bool {
         dragging || catAirborne || jumpStart != nil || landStart != nil || throwStart != nil
             || ball.state == .flying || ball.state == .returning || !particles.isEmpty
+            || now < mealUntil || now < mealBorderUntil
     }
 
     func scheduleTick(after interval: TimeInterval) {
@@ -477,6 +656,7 @@ final class GameView: NSView {
         updateBall(dt)
         updateBehavior()
         updateRestReminder(elapsed)
+        updateMealReminder()
         updateParticles(dt)
         updatePassThrough()
         render()
@@ -522,19 +702,22 @@ final class GameView: NSView {
         pose.time = now
         pose.sleeping = sleeping
 
+        let eating = now < mealUntil && !dragging
         if sleeping { pose.eyes = .sleepy }
         else if dragging || now < surprisedUntil { pose.eyes = .surprised }
-        else if now < happyUntil { pose.eyes = .happy }
+        else if eating || now < happyUntil { pose.eyes = .happy }
         else if now < blinkUntil { pose.eyes = .closed }
         else { pose.eyes = .open }
 
-        if sleeping { pose.mouth = .flat }
+        if eating {
+            pose.mouth = now.truncatingRemainder(dividingBy: 0.42) < 0.18 ? .open : .smile
+        } else if sleeping { pose.mouth = .flat }
         else if dragging || now < meowUntil { pose.mouth = .open }
         else { pose.mouth = .smile }
 
         if sleeping { pose.tailSwing = CGFloat(sin(now * 0.8)) * 0.2 }
         else if dragging { pose.tailSwing = CGFloat(sin(now * 14)) }
-        else if now < happyUntil { pose.tailSwing = CGFloat(sin(now * 9)) * 0.9 }
+        else if eating || now < happyUntil { pose.tailSwing = CGFloat(sin(now * 9)) * 0.9 }
         else { pose.tailSwing = CGFloat(sin(now * 2.2)) * 0.6 }
 
         let e = now - earTwitchStart
@@ -558,6 +741,7 @@ final class GameView: NSView {
         if ball.state == .held { pawTarget = 0.62 }
         if let ts = throwStart { pawTarget = now - ts < 0.28 ? 1 : 0 }
         if ball.state == .returning, returnProgress > 0.45 { pawTarget = 1 }
+        if now < mealUntil && ball.state != .held && throwStart == nil { pawTarget = 0.48 }
         pose.pawRaise = lerp(pose.pawRaise, pawTarget, min(1, dt * 14))
     }
 
@@ -762,6 +946,104 @@ final class GameView: NSView {
             bubbleKey = ""
         }
         scheduleTick(after: 0)
+    }
+
+    func dayStamp(_ date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Fires at 12:00 and 18:00. If the Mac was asleep, still reminds once within 15 minutes.
+    func updateMealReminder() {
+        guard mealReminderOn else { return }
+        let date = Date()
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        guard let hour = parts.hour, let minute = parts.minute, minute < 15 else { return }
+        let stamp = dayStamp(date)
+        if hour == 12 && mealLunchDay != stamp {
+            mealLunchDay = stamp
+            UserDefaults.standard.set(stamp, forKey: "mealLunchDay")
+            beginMeal(lunch: true, on: date)
+        } else if hour == 18 && mealDinnerDay != stamp {
+            mealDinnerDay = stamp
+            UserDefaults.standard.set(stamp, forKey: "mealDinnerDay")
+            beginMeal(lunch: false, on: date)
+        }
+        guard now < mealUntil else { return }
+        lastInteraction = now
+        sleeping = false
+        if now >= nextCrumb {
+            nextCrumb = now + 0.55
+            let at = foodPoint()
+            spawn("✦", color: NSColor(hex: 0xE0A060), at: at, count: 2, speed: 30...70, upward: true, size: 9, life: 0.7)
+        }
+    }
+
+    func beginMeal(lunch: Bool, on date: Date) {
+        let menu = MealKind.todays(lunch: lunch, on: date)
+        mealKind = menu.0
+        mealStart = now
+        mealUntil = now + 6.5
+        mealBorderUntil = now + 3
+        nextCrumb = now + 0.45
+        foodImageKey = ""
+        sleeping = false
+        lastInteraction = now
+        happyUntil = mealUntil
+        bubbleUntil = now
+        let when = lunch ? "午饭" : "晚饭"
+        say("\(when)时间到~ 今天吃\(menu.1)！", duration: 6.2)
+        play("Ping", volume: 0.4)
+        scheduleTick(after: 0)
+    }
+
+    func setMealReminderOn(_ on: Bool) {
+        mealReminderOn = on
+        UserDefaults.standard.set(on, forKey: "mealReminderEnabled")
+        if !on {
+            mealUntil = 0
+            mealBorderUntil = 0
+            mealKind = nil
+            foodLayer.isHidden = true
+            mealBorder.isHidden = true
+            if now < bubbleUntil { bubbleUntil = now }
+        }
+        scheduleTick(after: 0)
+    }
+
+    func foodPoint() -> CGPoint {
+        CGPoint(x: catPos.x + facing * 36 * catScale,
+                y: catPos.y + jumpOffset + 72 * catScale + CGFloat(sin(now * 8)) * 2.5)
+    }
+
+    func updateMealBorderFrame() {
+        mealBorder.frame = bounds
+        let fade: CGFloat = 84
+        let outer = playArea.isEmpty ? bounds : playArea
+        guard outer.width > fade * 2, outer.height > fade * 2,
+              let image = makeImage(size: bounds.size, { ctx in
+                  func wash(_ rect: CGRect, _ start: CGPoint, _ end: CGPoint) {
+                      ctx.saveGState()
+                      ctx.clip(to: rect)
+                      let colors = [NSColor.white.cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray
+                      guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) else { return }
+                      ctx.drawLinearGradient(gradient, start: start, end: end, options: [])
+                      ctx.restoreGState()
+                  }
+                  wash(CGRect(x: outer.minX, y: outer.maxY - fade, width: outer.width, height: fade),
+                       CGPoint(x: outer.midX, y: outer.maxY), CGPoint(x: outer.midX, y: outer.maxY - fade))
+                  wash(CGRect(x: outer.minX, y: outer.minY, width: outer.width, height: fade),
+                       CGPoint(x: outer.midX, y: outer.minY), CGPoint(x: outer.midX, y: outer.minY + fade))
+                  wash(CGRect(x: outer.minX, y: outer.minY, width: fade, height: outer.height),
+                       CGPoint(x: outer.minX, y: outer.midY), CGPoint(x: outer.minX + fade, y: outer.midY))
+                  wash(CGRect(x: outer.maxX - fade, y: outer.minY, width: fade, height: outer.height),
+                       CGPoint(x: outer.maxX, y: outer.midY), CGPoint(x: outer.maxX - fade, y: outer.midY))
+              }) else { return }
+        let mask = CALayer()
+        mask.frame = bounds
+        mask.contentsScale = backingScale
+        mask.contents = image
+        mealBorder.mask = mask
     }
 
     // MARK: Actions
@@ -1115,16 +1397,32 @@ final class GameView: NSView {
         ballLayer.bounds = CGRect(x: 0, y: 0, width: 2 * ballExtent, height: 2 * ballExtent)
         bubbleLayer.anchorPoint = .zero
 
+        mealBorder.type = .conic
+        mealBorder.startPoint = CGPoint(x: 0.5, y: 0.5)
+        mealBorder.endPoint = CGPoint(x: 0.5, y: 0)
+        mealBorder.colors = [
+            Palette.cream, Palette.fur, Palette.furDark, Palette.fur, Palette.cream,
+        ].map(\.cgColor)
+        mealBorder.locations = [0, 0.22, 0.5, 0.78, 1]
+        mealBorder.isHidden = true
+        foodLayer.bounds = CGRect(x: 0, y: 0, width: 72, height: 72)
+        foodLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        foodLayer.isHidden = true
+
         for l in [shadowLayer, ballShadowLayer, catRoot, ballLayer, ballGloss, bubbleLayer] { root.addSublayer(l) }
+        root.insertSublayer(mealBorder, at: 0)
+        root.insertSublayer(foodLayer, below: bubbleLayer)
+        updateMealBorderFrame()
     }
 
     /// (Re)renders the bitmaps that never change with pose; also needed when the backing scale changes.
     func rebuildStaticImages() {
         setupLayers()
         let scale = backingScale
-        for l in [shadowLayer, ballShadowLayer, ballGloss, catRoot, tailLayer, bodyLayer, ballLayer, bubbleLayer] {
+        for l in [shadowLayer, ballShadowLayer, ballGloss, catRoot, tailLayer, bodyLayer, ballLayer, bubbleLayer, foodLayer, mealBorder] {
             l.contentsScale = scale
         }
+        foodImageKey = ""
         catImageCache.removeAll()
         catImageOrder.removeAll()
         glyphCache.removeAll()
@@ -1273,6 +1571,48 @@ final class GameView: NSView {
         bubbleLayer.opacity = Float(min(1, (now - restShownAt) / 0.12))
     }
 
+    func drawMealFood() {
+        guard now < mealUntil, let kind = mealKind else {
+            foodLayer.isHidden = true
+            return
+        }
+        let age = now - mealStart
+        let bite = min(2, Int(age / 2.1))
+        let key = "\(kind)-\(bite)"
+        if key != foodImageKey {
+            foodImageKey = key
+            foodLayer.contents = makeImage(size: foodLayer.bounds.size) { ctx in
+                if bite > 0 {
+                    let radius: CGFloat = bite == 1 ? 13 : 20
+                    ctx.addRect(CGRect(origin: .zero, size: foodLayer.bounds.size))
+                    ctx.addEllipse(in: CGRect(x: 46 - radius, y: 40 - radius, width: radius * 2, height: radius * 2))
+                    ctx.clip(using: .evenOdd)
+                }
+                kind.draw(in: CGRect(x: 6, y: 8, width: 60, height: 56))
+            }
+        }
+        let pop: CGFloat = age < 0.28 ? CGFloat(sin(age / 0.28 * .pi / 2)) : 1
+        let shrink = 1 - CGFloat(min(age / 6.5, 1)) * 0.16
+        let sc = max(0.2, pop * shrink * 0.58)
+        foodLayer.isHidden = false
+        foodLayer.position = foodPoint()
+        foodLayer.transform = CATransform3DMakeScale(sc, sc, 1)
+    }
+
+    func drawMealBorder() {
+        guard now < mealBorderUntil else {
+            mealBorder.isHidden = true
+            return
+        }
+        let t = now - (mealBorderUntil - 3)
+        let envelope = sin(min(max(t, 0), 3) / 3 * .pi)
+        let pulse = 0.62 + 0.38 * abs(sin(t * .pi * 2))
+        mealBorder.isHidden = false
+        mealBorder.opacity = Float(0.95 * envelope * pulse)
+        let angle = CGFloat(t) * 1.4
+        mealBorder.endPoint = CGPoint(x: 0.5 + 0.5 * cos(angle), y: 0.5 + 0.5 * sin(angle))
+    }
+
     func render() {
         guard layersReady, let root = layer else { return }
         CATransaction.begin()
@@ -1361,7 +1701,10 @@ final class GameView: NSView {
             l.opacity = Float(1 - fade * fade)
         }
 
-        if restBubble {
+        drawMealFood()
+        drawMealBorder()
+
+        if restBubble && now >= mealUntil {
             drawRestBubble()
             return
         }
@@ -1406,61 +1749,14 @@ final class GameView: NSView {
     }
 }
 
-// MARK: - Menu
-
-/// Status-item row with a label and an NSSwitch. A plain menu item can only show a checkmark.
-final class RestSwitchRow: NSView {
-    let label = NSTextField(labelWithString: "休息提醒")
-    let toggle = NSSwitch()
-
-    init(isOn: Bool, target: AnyObject?, action: Selector) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 32))
-        label.font = .menuFont(ofSize: 0)
-        label.textColor = .labelColor
-        label.lineBreakMode = .byTruncatingTail
-        toggle.controlSize = .small
-        toggle.state = isOn ? .on : .off
-        toggle.target = target
-        toggle.action = action
-        addSubview(label)
-        addSubview(toggle)
-        layoutManual()
-    }
-
-    required init?(coder: NSCoder) { fatalError("not supported") }
-
-    override func layout() {
-        super.layout()
-        layoutManual()
-    }
-
-    /// Menu tracking delivers the click to the row, not the switch control inside it.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        bounds.contains(convert(point, from: superview)) ? self : nil
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        toggle.state = toggle.state == .on ? .off : .on
-        if let action = toggle.action {
-            NSApp.sendAction(action, to: toggle.target, from: toggle)
-        }
-    }
-
-    func layoutManual() {
-        let sw = toggle.fittingSize
-        toggle.frame = NSRect(x: bounds.width - sw.width - 16, y: (bounds.height - sw.height) / 2, width: sw.width, height: sw.height)
-        label.sizeToFit()
-        label.frame = NSRect(x: 18, y: (bounds.height - label.frame.height) / 2,
-                             width: max(40, toggle.frame.minX - 26), height: label.frame.height)
-    }
-}
-
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var panel: NSPanel!
     var game: GameView!
     var statusItem: NSStatusItem!
+    var restItem: NSMenuItem!
+    var mealItem: NSMenuItem!
     var soundItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -1497,13 +1793,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "丢毛线球", action: #selector(throwBall), keyEquivalent: "").target = self
         menu.addItem(withTitle: "睡觉 / 叫醒", action: #selector(toggleSleep), keyEquivalent: "").target = self
         menu.addItem(withTitle: "回到右下角", action: #selector(resetPosition), keyEquivalent: "").target = self
-        let restItem = NSMenuItem()
-        restItem.view = RestSwitchRow(isOn: game.restReminderOn, target: self, action: #selector(toggleRestReminder(_:)))
-        menu.addItem(restItem)
+        restItem = menu.addItem(withTitle: "休息提醒", action: #selector(toggleRestReminder), keyEquivalent: "")
+        restItem.target = self
+        restItem.state = game.restReminderOn ? .on : .off
+        mealItem = menu.addItem(withTitle: "吃饭提醒", action: #selector(toggleMealReminder), keyEquivalent: "")
+        mealItem.target = self
+        mealItem.state = game.mealReminderOn ? .on : .off
         soundItem = menu.addItem(withTitle: "音效", action: #selector(toggleSound), keyEquivalent: "")
         soundItem.target = self
-        soundItem.state = .on
+        soundItem.state = game.soundOn ? .on : .off
         menu.addItem(.separator())
+        menu.addItem(withTitle: "预览午饭", action: #selector(previewLunch), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "预览晚饭", action: #selector(previewDinner), keyEquivalent: "").target = self
         menu.addItem(withTitle: "退出橘猫", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
     }
@@ -1511,9 +1812,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func throwBall() { game.menuThrow() }
     @objc func toggleSleep() { game.toggleSleep() }
     @objc func resetPosition() { game.menuResetPosition() }
-    @objc func toggleRestReminder(_ sender: NSSwitch) {
-        game.setRestReminderOn(sender.state == .on)
+    @objc func toggleRestReminder() {
+        game.setRestReminderOn(!game.restReminderOn)
+        restItem.state = game.restReminderOn ? .on : .off
     }
+    @objc func toggleMealReminder() {
+        game.setMealReminderOn(!game.mealReminderOn)
+        mealItem.state = game.mealReminderOn ? .on : .off
+    }
+    @objc func previewLunch() { game.beginMeal(lunch: true, on: Date()) }
+    @objc func previewDinner() { game.beginMeal(lunch: false, on: Date()) }
     @objc func toggleSound() {
         game.soundOn.toggle()
         soundItem.state = game.soundOn ? .on : .off
