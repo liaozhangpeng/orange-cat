@@ -16,6 +16,17 @@ func oval(_ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) -> NSBezierP
 // by exact (size, weight) so repeated frames at the same size are a dictionary hit.
 private var roundedFontCache: [String: NSFont] = [:]
 
+/// Time since the last keyboard, mouse, or scroll event, system-wide.
+func secondsSinceUserInput() -> CFTimeInterval {
+    let types: [CGEventType] = [
+        .keyDown, .flagsChanged, .leftMouseDown, .rightMouseDown, .otherMouseDown,
+        .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel,
+    ]
+    return types.reduce(CFTimeInterval.greatestFiniteMagnitude) {
+        min($0, CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: $1))
+    }
+}
+
 func roundedFont(_ size: CGFloat, _ weight: NSFont.Weight = .bold) -> NSFont {
     let key = "\(size)-\(weight.rawValue)"
     if let cached = roundedFontCache[key] { return cached }
@@ -350,6 +361,18 @@ final class GameView: NSView {
     var bubbleText: String?
     var bubbleStart = 0.0, bubbleUntil = 0.0
 
+    // Daytime eye-rest reminder. Active computer use between 09:00 and 20:00.
+    var restReminderOn = UserDefaults.standard.object(forKey: "restReminderEnabled") as? Bool ?? true
+    var activeUse: Double = 0
+    var remindAfter: Double = 60 * 60
+    var restBubble = false
+    var restShownAt = 0.0
+    var restButtonDown = false
+    var restHit = CGRect.zero
+    var restButtonRect = CGRect.zero
+    let restFirstUse: Double = 60 * 60
+    let restRepeatUse: Double = 30 * 60
+
     // Input
     var pressed: Target = .nothing
     var mouseDownPoint = CGPoint.zero
@@ -419,7 +442,7 @@ final class GameView: NSView {
     /// sleeping are those drifting z's — hearts/stars/notes all come from
     /// play events that wake the cat via wake(), so no need to check for them.)
     var isFullyIdle: Bool {
-        sleeping && !dragging && !catAirborne
+        !restBubble && sleeping && !dragging && !catAirborne
             && ball.state == .none
             && jumpStart == nil && landStart == nil && throwStart == nil
             && now >= bubbleUntil
@@ -442,7 +465,8 @@ final class GameView: NSView {
 
     @objc func tick() {
         let t = CACurrentMediaTime()
-        let dt = CGFloat(min(t - now, 1.0 / 20.0))
+        let elapsed = t - now
+        let dt = CGFloat(min(elapsed, 1.0 / 20.0))
         now = t
         if let w = hostWindow {
             let m = NSEvent.mouseLocation
@@ -452,6 +476,7 @@ final class GameView: NSView {
         updatePose(dt)
         updateBall(dt)
         updateBehavior()
+        updateRestReminder(elapsed)
         updateParticles(dt)
         updatePassThrough()
         render()
@@ -660,11 +685,83 @@ final class GameView: NSView {
         }
     }
 
-    /// The overlay covers the whole screen, so only accept clicks while the cursor is over the cat or the ball.
+    /// The overlay covers the whole screen, so only accept clicks while the cursor is over the cat, the ball, or the rest reminder.
     func updatePassThrough() {
         guard let w = hostWindow else { return }
-        let interactive = dragging || pressed != .nothing || hitBall(mouse) || hitCat(mouse)
+        if let layout = restLayout() {
+            restHit = layout.hit
+            restButtonRect = layout.button
+        } else {
+            restHit = .zero
+            restButtonRect = .zero
+        }
+        let overRest = restBubble && restHit.contains(mouse)
+        let interactive = dragging || pressed != .nothing || restButtonDown || overRest || hitBall(mouse) || hitCat(mouse)
         if w.ignoresMouseEvents == interactive { w.ignoresMouseEvents = !interactive }
+    }
+
+    func isRestHours(_ date: Date = Date()) -> Bool {
+        let hour = Calendar.current.component(.hour, from: date)
+        return hour >= 9 && hour < 20
+    }
+
+    /// Pauses while the user is away, resets after a 5-minute break, and prompts after 1 hour of use (then every 30 minutes).
+    func updateRestReminder(_ elapsed: Double) {
+        guard restReminderOn, isRestHours() else {
+            if restBubble { restBubble = false }
+            activeUse = 0
+            remindAfter = restFirstUse
+            return
+        }
+        let idle = secondsSinceUserInput()
+        if idle >= 5 * 60 {
+            restBubble = false
+            restButtonDown = false
+            activeUse = 0
+            remindAfter = restFirstUse
+            return
+        }
+        if restBubble {
+            lastInteraction = now
+            return
+        }
+        guard idle <= 90 else { return }
+        activeUse += elapsed
+        if activeUse >= remindAfter { showRestReminder() }
+    }
+
+    func showRestReminder() {
+        guard !restBubble else { return }
+        restBubble = true
+        restShownAt = now
+        restButtonDown = false
+        bubbleUntil = now
+        if sleeping { sleeping = false }
+        lastInteraction = now
+        surprisedUntil = now + 0.8
+        meowUntil = now + 0.4
+        play("Glass", volume: 0.4)
+    }
+
+    func acknowledgeRestReminder() {
+        restBubble = false
+        restButtonDown = false
+        bubbleKey = ""
+        activeUse = 0
+        remindAfter = restRepeatUse
+    }
+
+    func setRestReminderOn(_ on: Bool) {
+        restReminderOn = on
+        UserDefaults.standard.set(on, forKey: "restReminderEnabled")
+        if !on {
+            restBubble = false
+            restButtonDown = false
+            activeUse = 0
+            remindAfter = restFirstUse
+            bubbleKey = ""
+        }
+        scheduleTick(after: 0)
     }
 
     // MARK: Actions
@@ -874,7 +971,14 @@ final class GameView: NSView {
     override func mouseDown(with event: NSEvent) {
         scheduleTick(after: 0)  // guarantee a full-rate tick picks up whatever this click triggers
         let p = convert(event.locationInWindow, from: nil)
+        mouse = p
         mouseDownPoint = p
+        if restBubble && restHit.contains(p) {
+            pressed = .nothing
+            restButtonDown = restButtonRect.contains(p)
+            render()
+            return
+        }
         if hitBall(p) {
             pressed = .ball
             clickBall()
@@ -887,6 +991,11 @@ final class GameView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if restButtonDown {
+            mouse = convert(event.locationInWindow, from: nil)
+            render()
+            return
+        }
         guard pressed == .cat else { return }
         let p = convert(event.locationInWindow, from: nil)
         if !dragging {
@@ -906,6 +1015,13 @@ final class GameView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if restButtonDown {
+            let p = convert(event.locationInWindow, from: nil)
+            restButtonDown = false
+            if restButtonRect.contains(p) { acknowledgeRestReminder() }
+            scheduleTick(after: 0)
+            return
+        }
         defer { pressed = .nothing }
         guard pressed == .cat else { return }
         if dragging {
@@ -1042,6 +1158,121 @@ final class GameView: NSView {
         return img
     }
 
+    struct RestLayout {
+        var body: CGRect
+        var button: CGRect
+        var hit: CGRect
+        var tailX: CGFloat
+        var imageSize: CGSize
+        var layerOrigin: CGPoint
+        var text: NSAttributedString
+        var imageText: CGRect
+        var imageButton: CGRect
+    }
+
+    func restMessage() -> NSAttributedString {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        style.lineSpacing = 3
+        return NSAttributedString(string: "该休息眼睛了\n出去活动 5 分钟再回来~", attributes: [
+            .font: roundedFont(15),
+            .foregroundColor: Palette.text,
+            .paragraphStyle: style,
+        ])
+    }
+
+    /// Dialog above the cat, shifted aside when the cat is too close to the top of the screen.
+    func restLayout() -> RestLayout? {
+        guard restBubble else { return nil }
+        let text = restMessage()
+        let measured = text.boundingRect(with: CGSize(width: 280, height: 80), options: [.usesLineFragmentOrigin, .usesFontLeading])
+        let textW = ceil(measured.width), textH = ceil(measured.height)
+        let buttonW: CGFloat = 96, buttonH: CGFloat = 28
+        let padX: CGFloat = 18, padTop: CGFloat = 14, padBottom: CGFloat = 12, gap: CGFloat = 10
+        let w = max(textW, buttonW) + padX * 2
+        let h = padTop + textH + gap + buttonH + padBottom
+
+        var x = clamp(catPos.x - w / 2, playArea.minX + 8, playArea.maxX - w - 8)
+        var y = headTop + 16
+        if y + h > playArea.maxY - 8 || y < catPos.y + 170 * catScale {
+            let left = catPos.x - playArea.minX
+            let right = playArea.maxX - catPos.x
+            if left >= right {
+                x = clamp(catPos.x - 70 * catScale - w - 10, playArea.minX + 8, playArea.maxX - w - 8)
+            } else {
+                x = clamp(catPos.x + 70 * catScale + 10, playArea.minX + 8, playArea.maxX - w - 8)
+            }
+            y = clamp(headCenter.y - h / 2, playArea.minY + 8, playArea.maxY - h - 8)
+        }
+        let body = CGRect(x: x, y: y, width: w, height: h)
+        let button = CGRect(x: body.midX - buttonW / 2, y: body.minY + padBottom, width: buttonW, height: buttonH)
+        let tailX = clamp(catPos.x, body.minX + 18, body.maxX - 18) - body.minX
+        let tail = CGRect(x: body.minX + tailX - 10, y: body.minY - 12, width: 20, height: 14)
+        let imageBody = CGRect(x: 2, y: 11, width: w, height: h)
+        let imageText = CGRect(x: imageBody.minX + padX, y: imageBody.minY + padBottom + buttonH + gap,
+                               width: w - padX * 2, height: textH)
+        let imageButton = CGRect(x: imageBody.midX - buttonW / 2, y: imageBody.minY + padBottom, width: buttonW, height: buttonH)
+        return RestLayout(body: body, button: button, hit: body.union(tail).insetBy(dx: -4, dy: -4),
+                          tailX: tailX, imageSize: CGSize(width: w + 4, height: h + 16),
+                          layerOrigin: CGPoint(x: x - 2, y: y - 11), text: text, imageText: imageText,
+                          imageButton: imageButton)
+    }
+
+    func drawRestBubble() {
+        guard let layout = restLayout() else {
+            bubbleLayer.isHidden = true
+            return
+        }
+        restHit = layout.hit
+        restButtonRect = layout.button
+        let pressed = restButtonDown && layout.button.contains(mouse)
+        let hover = !restButtonDown && layout.button.contains(mouse)
+        let key = "rest|\(layout.tailX.rounded())|\(pressed)|\(hover)"
+        if key != bubbleKey {
+            bubbleKey = key
+            bubbleLayer.bounds = CGRect(origin: .zero, size: layout.imageSize)
+            bubbleLayer.contents = makeImage(size: layout.imageSize) { _ in
+                let r = CGRect(x: 2, y: 11, width: layout.body.width, height: layout.body.height)
+                let path = NSBezierPath(roundedRect: r, xRadius: 16, yRadius: 16)
+                let tx = r.minX + layout.tailX
+                let tail = NSBezierPath()
+                tail.move(to: P(tx - 8, r.minY + 1))
+                tail.line(to: P(tx, r.minY - 10))
+                tail.line(to: P(tx + 8, r.minY + 1))
+                tail.lineJoinStyle = .round
+                NSColor.white.withAlphaComponent(0.98).setFill()
+                Palette.outline.setStroke()
+                path.lineWidth = 2.5
+                path.stroke()
+                tail.lineWidth = 2.5
+                tail.stroke()
+                path.fill()
+                tail.fill()
+                layout.text.draw(with: layout.imageText, options: [.usesLineFragmentOrigin, .usesFontLeading])
+                let button = NSBezierPath(roundedRect: layout.imageButton, xRadius: layout.imageButton.height / 2, yRadius: layout.imageButton.height / 2)
+                let fill = pressed ? Palette.furDark : (hover ? NSColor(hex: 0xFFB85C) : Palette.fur)
+                fill.setFill()
+                button.fill()
+                Palette.outline.setStroke()
+                button.lineWidth = 1.6
+                button.stroke()
+                let title = NSAttributedString(string: "我知道了", attributes: [
+                    .font: roundedFont(13),
+                    .foregroundColor: Palette.text,
+                ])
+                let sz = title.size()
+                title.draw(at: CGPoint(x: layout.imageButton.midX - sz.width / 2, y: layout.imageButton.midY - sz.height / 2))
+            }
+        }
+        bubbleLayer.shadowColor = NSColor.black.cgColor
+        bubbleLayer.shadowOpacity = 0.18
+        bubbleLayer.shadowRadius = 10
+        bubbleLayer.shadowOffset = CGSize(width: 0, height: -2)
+        bubbleLayer.isHidden = false
+        bubbleLayer.position = layout.layerOrigin
+        bubbleLayer.opacity = Float(min(1, (now - restShownAt) / 0.12))
+    }
+
     func render() {
         guard layersReady, let root = layer else { return }
         CATransaction.begin()
@@ -1130,6 +1361,12 @@ final class GameView: NSView {
             l.opacity = Float(1 - fade * fade)
         }
 
+        if restBubble {
+            drawRestBubble()
+            return
+        }
+        bubbleLayer.shadowOpacity = 0
+
         // Speech bubble: bitmap re-rendered only when its text (or tail offset) changes.
         guard let text = bubbleText, now < bubbleUntil else {
             bubbleLayer.isHidden = true
@@ -1166,6 +1403,55 @@ final class GameView: NSView {
         bubbleLayer.isHidden = false
         bubbleLayer.position = CGPoint(x: x - 2, y: y - 11)
         bubbleLayer.opacity = Float(min(1, (now - bubbleStart) / 0.12, (bubbleUntil - now) / 0.3))
+    }
+}
+
+// MARK: - Menu
+
+/// Status-item row with a label and an NSSwitch. A plain menu item can only show a checkmark.
+final class RestSwitchRow: NSView {
+    let label = NSTextField(labelWithString: "休息提醒")
+    let toggle = NSSwitch()
+
+    init(isOn: Bool, target: AnyObject?, action: Selector) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 32))
+        label.font = .menuFont(ofSize: 0)
+        label.textColor = .labelColor
+        label.lineBreakMode = .byTruncatingTail
+        toggle.controlSize = .small
+        toggle.state = isOn ? .on : .off
+        toggle.target = target
+        toggle.action = action
+        addSubview(label)
+        addSubview(toggle)
+        layoutManual()
+    }
+
+    required init?(coder: NSCoder) { fatalError("not supported") }
+
+    override func layout() {
+        super.layout()
+        layoutManual()
+    }
+
+    /// Menu tracking delivers the click to the row, not the switch control inside it.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(convert(point, from: superview)) ? self : nil
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        toggle.state = toggle.state == .on ? .off : .on
+        if let action = toggle.action {
+            NSApp.sendAction(action, to: toggle.target, from: toggle)
+        }
+    }
+
+    func layoutManual() {
+        let sw = toggle.fittingSize
+        toggle.frame = NSRect(x: bounds.width - sw.width - 16, y: (bounds.height - sw.height) / 2, width: sw.width, height: sw.height)
+        label.sizeToFit()
+        label.frame = NSRect(x: 18, y: (bounds.height - label.frame.height) / 2,
+                             width: max(40, toggle.frame.minX - 26), height: label.frame.height)
     }
 }
 
@@ -1211,6 +1497,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "丢毛线球", action: #selector(throwBall), keyEquivalent: "").target = self
         menu.addItem(withTitle: "睡觉 / 叫醒", action: #selector(toggleSleep), keyEquivalent: "").target = self
         menu.addItem(withTitle: "回到右下角", action: #selector(resetPosition), keyEquivalent: "").target = self
+        let restItem = NSMenuItem()
+        restItem.view = RestSwitchRow(isOn: game.restReminderOn, target: self, action: #selector(toggleRestReminder(_:)))
+        menu.addItem(restItem)
         soundItem = menu.addItem(withTitle: "音效", action: #selector(toggleSound), keyEquivalent: "")
         soundItem.target = self
         soundItem.state = .on
@@ -1222,6 +1511,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func throwBall() { game.menuThrow() }
     @objc func toggleSleep() { game.toggleSleep() }
     @objc func resetPosition() { game.menuResetPosition() }
+    @objc func toggleRestReminder(_ sender: NSSwitch) {
+        game.setRestReminderOn(sender.state == .on)
+    }
     @objc func toggleSound() {
         game.soundOn.toggle()
         soundItem.state = game.soundOn ? .on : .off
