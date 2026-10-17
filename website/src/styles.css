@@ -1,0 +1,276 @@
+:root {
+  --fur: #f7a541;
+  --fur-dark: #e07f22;
+  --outline: #8a4a16;
+  --cream: #ffebcd;
+  --pink: #ff9aa8;
+  --yarn: #e8587a;
+  --text: #5a3212;
+  --eye: #3a2618;
+  --paper: #fff8ee;
+  font-family: "Nunito", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  color: var(--text);
+  background: var(--paper);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+h1, h2, h3, .brand, .bubble, .download {
+  font-family: "ZCOOL KuaiLe", "PingFang SC", cursive;
+  font-weight: 400;
+}
+
+a { color: inherit; }
+
+.sky {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  background: #ffe1b5;
+}
+
+.blob.one { width: 420px; height: 420px; top: -120px; right: -80px; }
+.blob.two { width: 280px; height: 280px; bottom: 40px; left: -90px; background: #ffd0d6; }
+
+.paw {
+  position: absolute;
+  font-size: 42px;
+  opacity: 0.28;
+}
+
+.p1 { top: 18%; left: 8%; transform: rotate(-20deg); }
+.p2 { right: 10%; bottom: 16%; transform: rotate(24deg); }
+
+.top, main, footer { position: relative; z-index: 1; }
+
+.top {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 28px;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  background: white;
+  border: 3px solid var(--outline);
+  border-radius: 50%;
+}
+
+.top-download {
+  text-decoration: none;
+  background: white;
+  border: 3px solid var(--outline);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 800;
+}
+
+.hero {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 24px 12px;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin: 0 0 8px;
+  background: white;
+  border: 2px solid var(--outline);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 800;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(40px, 6vw, 68px);
+  line-height: 1.05;
+}
+
+.lead {
+  font-size: 20px;
+  line-height: 1.55;
+  max-width: 34em;
+}
+
+.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.download {
+  display: inline-flex;
+  flex-direction: column;
+  text-decoration: none;
+  background: var(--fur);
+  color: var(--text);
+  border: 3px solid var(--outline);
+  border-radius: 22px;
+  padding: 14px 22px 12px;
+  box-shadow: 0 6px 0 var(--outline);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.download small {
+  margin-top: 6px;
+  font-family: "Nunito", "PingFang SC", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.download:hover { transform: translateY(-2px); }
+.download:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--outline); }
+
+.note { font-weight: 700; }
+
+.stage {
+  position: relative;
+  min-height: 340px;
+  display: grid;
+  place-items: end center;
+}
+
+.bubble {
+  position: absolute;
+  top: -8px;
+  right: 0;
+  margin: 0;
+  background: white;
+  border: 3px solid var(--outline);
+  border-radius: 22px;
+  padding: 10px 16px;
+  font-size: 22px;
+}
+
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  bottom: -12px;
+  border-width: 12px 10px 0;
+  border-style: solid;
+  border-color: var(--outline) transparent transparent;
+}
+
+.cat {
+  width: min(100%, 360px);
+  height: auto;
+  overflow: visible;
+}
+
+.cat .fur { fill: var(--fur); stroke: var(--outline); stroke-width: 4; }
+.cat .fur-cap { fill: var(--fur); stroke: none; }
+.cat .belly { fill: var(--cream); stroke: none; }
+.cat .paw { fill: var(--cream); stroke: var(--outline); stroke-width: 3.5; }
+.cat .stripe { fill: none; stroke: var(--fur-dark); stroke-width: 5.5; stroke-linecap: round; }
+.cat .eye { fill: var(--eye); stroke: none; }
+.cat .eye-light { fill: white; stroke: none; }
+.cat .mouth { fill: none; stroke: var(--outline); stroke-width: 2.8; stroke-linecap: round; }
+.cat .whisker { fill: none; stroke: var(--outline); stroke-width: 2; stroke-linecap: round; opacity: 0.6; }
+.cat .toe { fill: none; stroke: var(--outline); stroke-width: 2; stroke-linecap: round; }
+.cat .blush { fill: var(--pink); opacity: 0.55; }
+.cat .nose { fill: var(--pink); stroke: var(--pink); stroke-width: 3; stroke-linejoin: round; }
+.cat .ear-inner { fill: var(--pink); stroke: none; }
+.cat .ear { fill: var(--fur); stroke: var(--outline); stroke-width: 4; stroke-linejoin: round; }
+.cat .leg { fill: none; stroke: var(--outline); stroke-width: 24; stroke-linecap: round; }
+.cat .leg-fur { fill: none; stroke: var(--fur); stroke-width: 16; stroke-linecap: round; }
+.cat .tail { fill: none; stroke: var(--outline); stroke-width: 22; stroke-linecap: round; }
+.cat .tail-fur { fill: none; stroke: var(--fur); stroke-width: 14; stroke-linecap: round; }
+.cat .tail-tip { fill: var(--fur-dark); stroke: none; }
+.cat .shadow { fill: #000; opacity: 0.12; }
+.cat .ball { fill: var(--yarn); stroke: #b93a5c; stroke-width: 2.5; }
+.cat .ball-line { fill: none; stroke: #ff9db4; stroke-width: 2; }
+.cat .thread { fill: none; stroke: #b93a5c; stroke-width: 2.5; stroke-linecap: round; }
+.cat .gloss { fill: white; opacity: 0.45; }
+
+.cat { animation: sit 2.8s ease-in-out infinite; }
+
+@keyframes sit {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.panel, .install {
+  max-width: 1040px;
+  margin: 12px auto;
+  padding: 8px 24px 20px;
+}
+
+h2 { font-size: 36px; margin: 12px 0; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.cards.two { grid-template-columns: 1fr 1fr; }
+
+.card {
+  background: white;
+  border: 3px solid var(--outline);
+  border-radius: 24px;
+  padding: 8px 18px 16px;
+}
+
+.card h3 { margin-bottom: 0; font-size: 26px; }
+.card p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; font-weight: 700; }
+
+.install {
+  background: white;
+  border: 3px solid var(--outline);
+  border-radius: 28px;
+  padding: 8px 28px 24px;
+  margin-bottom: 36px;
+}
+
+.install ol { font-size: 18px; font-weight: 800; line-height: 1.6; padding-left: 1.2em; }
+.second { margin-top: 8px; }
+
+footer {
+  text-align: center;
+  padding: 0 16px 32px;
+  font-weight: 800;
+}
+
+@media (max-width: 800px) {
+  .hero, .cards, .cards.two { grid-template-columns: 1fr; }
+  .stage {
+    min-height: 0;
+    justify-items: center;
+  }
+  .bubble {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 0 0 8px;
+  }
+}
